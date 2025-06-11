@@ -1,4 +1,3 @@
-// context/AppContext.tsx
 import React, {
   createContext,
   useContext,
@@ -54,6 +53,7 @@ interface AppState {
     id: string;
     type: 'success' | 'error' | 'info';
     message: string;
+    timestamp: number;
   }>;
 }
 
@@ -146,9 +146,16 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, isOnline: action.payload };
     case 'ADD_NOTIFICATION': {
       const id = Date.now().toString();
+      const timestamp = Date.now();
+      const newNotification = { id, timestamp, ...action.payload };
+      
+      // Limit to maximum 3 notifications to prevent overwhelming the user
+      const updatedNotifications = [...state.notifications, newNotification];
+      const limitedNotifications = updatedNotifications.slice(-3);
+      
       return {
         ...state,
-        notifications: [...state.notifications, { id, ...action.payload }],
+        notifications: limitedNotifications,
       };
     }
     case 'REMOVE_NOTIFICATION':
@@ -210,15 +217,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // Improved notification timeout management with staggered timeouts
   useEffect(() => {
-    const latest = state.notifications[state.notifications.length - 1];
-    if (latest) {
+    if (state.notifications.length === 0) return;
+
+    const timeouts: NodeJS.Timeout[] = [];
+
+    state.notifications.forEach((notification, index) => {
+      // Calculate timeout based on position and age
+      const age = Date.now() - notification.timestamp;
+      const baseTimeout = 3000; // 3 seconds base timeout
+      const stackDelay = index * 500; // 500ms delay for each position in stack
+      const adjustedTimeout = Math.max(baseTimeout - age + stackDelay, 1000); // Minimum 1 second
+
       const timeout = setTimeout(() => {
-        dispatch({ type: 'REMOVE_NOTIFICATION', payload: latest.id });
-      }, 5000);
-      return () => clearTimeout(timeout);
-    }
-  }, [state.notifications.length]);
+        dispatch({ type: 'REMOVE_NOTIFICATION', payload: notification.id });
+      }, adjustedTimeout);
+
+      timeouts.push(timeout);
+    });
+
+    return () => {
+      timeouts.forEach(timeout => clearTimeout(timeout));
+    };
+  }, [state.notifications]);
 
   return (
     <AppContext.Provider value={{ state, dispatch }}>
