@@ -23,7 +23,7 @@ export function NotificationContainer() {
   };
 
   return (
-    <div className="fixed top-20 right-4 z-[60] space-y-2 max-w-sm">
+    <div className="fixed top-20 right-4 z-[110] space-y-2 max-w-sm">
       <AnimatePresence>
         {state.notifications.map((notification) => {
           const Icon = iconMap[notification.type];
